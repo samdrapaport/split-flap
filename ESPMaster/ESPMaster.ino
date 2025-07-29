@@ -23,12 +23,12 @@
   These define statements can be changed as you desire for changing the functionality and
   behaviour of your device.
 */
-#define SERIAL_ENABLE       false   //Option to enable serial debug messages. "true" Will disable I2C communications to allow serial monitoring.
+#define SERIAL_ENABLE       true   //Option to enable serial debug messages. "true" Will disable I2C communications to allow serial monitoring.
 #define UNIT_CALLS_DISABLE  false   //Option to disable the call to the units so can just debug the ESP with no connections
 #define OTA_ENABLE          true    //Option to enable OTA functionality
-#define UNITS_AMOUNT        10      //Amount of connected units !IMPORTANT TO BE SET CORRECTLY!
-#define SERIAL_BAUDRATE     115200  //Serial debugging BAUD rate
-#define WIFI_USE_DIRECT     false   //Option to either direct connect to a WiFi Network or setup a AP to configure WiFi. Setting to false will setup as a AP.
+#define UNITS_AMOUNT        1      //Amount of connected units !IMPORTANT TO BE SET CORRECTLY!
+#define SERIAL_BAUDRATE     9600  //Serial debugging BAUD rate
+#define WIFI_USE_DIRECT     true   //Option to either direct connect to a WiFi Network or setup a AP to configure WiFi. Setting to false will setup as a AP.
 
 /*
   EXPERIMENTAL: Try to use your Router when possible to set a Static IP address for your device to avoid conflicts with other devices
@@ -64,7 +64,7 @@
 
 //WiFi Setup Library if we use that mode
 //Specifically put here in this order to avoid conflict with other libraries
-#if WIFI_USE_DIRECT == false
+#if WIFI_USE_DIRECT == true
 //Needed in order to be compatible with WiFiManager: https://github.com/me-no-dev/ESPAsyncWebServer/issues/418#issuecomment-667976368
 #define WEBSERVER_H
 #include <WiFiManager.h>
@@ -97,15 +97,15 @@
   Settings you can feel free to change to customise how your display works.
 */
 //Used if connecting via "WIFI_USE_DIRECT" of "true" - Otherwise, leave blank
-const char* wifiDirectSsid = "";
-const char* wifiDirectPassword = "";
+const char* wifiDirectSsid = "KernvilleCowork";
+const char* wifiDirectPassword = "Connect8902";
 
 //Change if you want to have an Over The Air (OTA) Password for updates
 const char* otaPassword = "";
 
 //Change this to your timezone, use the TZ database name
 //https://en.wikipedia.org/wiki/List_of_tz_database_time_zones
-const char* timezoneString = "Europe/London";
+const char* timezoneString = "America/Los_Angeles";
 // timezonePosix: Defines time zone rules in POSIX format. Empty here, so no custom rules are applied.
 // Example for Central European Time: const char* timezonePosix = "CET-1CEST,M3.5.0,M10.5.0/3";
 const char* timezonePosix = "";
@@ -126,7 +126,7 @@ const int scheduledMessageDisplayTimeMillis = 7500;
 #if WIFI_STATIC_IP == true
 //Static IP address for your device. Try take care to not conflict with something else on your network otherwise
 //it is likely to not work
-IPAddress wifiDeviceStaticIp(192, 168, 1, 100);
+IPAddress wifiDeviceStaticIp(192, 168, 1, 200);
 
 //Your router details
 IPAddress wifiRouterGateway(192, 168, 1, 1);
@@ -171,6 +171,7 @@ const char* DEVICE_MODE_TEXT = "text";
 const char* DEVICE_MODE_CLOCK = "clock";
 const char* DEVICE_MODE_DATE = "date";
 const char* DEVICE_MODE_COUNTDOWN = "countdown";
+const char* DEVICE_MODE_FLOW = "flow";
 
 //Alignment options
 const char* ALIGNMENT_MODE_LEFT = "left";
@@ -183,6 +184,14 @@ const char* flapSpeedPath = "/flapspeed.txt";
 const char* deviceModePath = "/devicemode.txt";
 const char* countdownPath = "/countdown.txt";
 const char* scheduledMessagesPath = "/scheduled-messages.txt";
+const char* flowPath = "/flow.txt";
+
+//Flow Options
+std::map<int, String> riverIdToName = {
+  {105, "Kern - Below Lake Isabella"},
+  {123, "Kern - Below Fairview Dam"},
+  {124, "Kern - Above Fairview Dam"}
+};
 
 //Variables for storing things for checking and use in normal running
 String alignment = "";
@@ -378,7 +387,7 @@ void setup() {
           //HTTP POST device mode value
           if (p->name() == PARAM_DEVICEMODE) {
             String receivedValue = p->value();
-            if (receivedValue == DEVICE_MODE_TEXT || receivedValue == DEVICE_MODE_CLOCK || receivedValue == DEVICE_MODE_DATE || receivedValue == DEVICE_MODE_COUNTDOWN) {
+            if (receivedValue == DEVICE_MODE_TEXT || receivedValue == DEVICE_MODE_CLOCK || receivedValue == DEVICE_MODE_DATE || receivedValue == DEVICE_MODE_COUNTDOWN || receivedValue == DEVICE_MODE_FLOW) {
               newDeviceModeValue = receivedValue;          
             }
             else {
@@ -395,6 +404,17 @@ void setup() {
           //HTTP POST inputText value
           if (p->name() == PARAM_INPUT_TEXT) {
             newInputTextValue = p->value().c_str();
+          }
+
+          /if (deviceMode == DEVICE_MODE_FLOW) {
+            String selectedFlows = webServer.arg("selectedFlows"); // e.g., "105,123"
+            Serial.println("Flow Mode selected");
+            Serial.print("Selected Flow IDs: ");
+            Serial.println(selectedFlows);
+        
+            // Store the selected flows however your app manages settings
+            // Example: split and store to EEPROM, global variable, or file
+ 
           }
 
           //HTTP POST Schedule Enabled
@@ -700,7 +720,7 @@ void loop() {
     checkCountdown();
 
     //Mode Selection
-    if (deviceMode == DEVICE_MODE_TEXT || deviceMode == DEVICE_MODE_COUNTDOWN) { 
+    if (deviceMode == DEVICE_MODE_TEXT || deviceMode == DEVICE_MODE_COUNTDOWN || deviceMode == DEVICE_MODE_FLOW) { 
       showText(inputText);
     } 
     else if (deviceMode == DEVICE_MODE_DATE) {
@@ -751,4 +771,68 @@ String getCurrentSettingValues() {
   serializeJson(document, jsonString);
 
   return jsonString;
+}
+
+String downloadDreamflowsCsv() {
+  WiFiClientSecure client;
+  client.setInsecure(); // WARNING: insecure connection
+
+  if (!client.connect("www.dreamflows.com", 443)) {
+    Serial.println("Connection to Dreamflows failed");
+    return "";
+  }
+
+  client.print("GET /realtime.csv.php HTTP/1.1\r\n" \
+               "Host: www.dreamflows.com\r\n" \
+               "Connection: close\r\n\r\n");
+
+  bool bodyStarted = false;
+  String csv = "";
+
+  while (client.connected()) {
+    String line = client.readStringUntil('\n');
+    if (line == "\r") {
+      bodyStarted = true;
+      continue;
+    }
+    if (bodyStarted) {
+      csv += line + "\n";
+    }
+  }
+
+  client.stop();
+  return csv;
+}
+
+void displayMatchingFlows(String csv, std::vector<int> riverIds) {
+  for (int id : riverIds) {
+    if (riverIdToName.find(id) == riverIdToName.end()) continue;
+
+    String riverName = riverIdToName[id];
+
+    int lineStart = 0;
+    while (lineStart >= 0) {
+      int lineEnd = csv.indexOf('\n', lineStart);
+      if (lineEnd < 0) break;
+
+      String line = csv.substring(lineStart, lineEnd);
+      if (line.indexOf(riverName) >= 0) {
+        Serial.print("Flow for ");
+        Serial.print(riverName);
+        Serial.print(": ");
+
+        // Example: line might be: "Kern - Below Lake Isabella,...,480,..."
+        int secondComma = line.indexOf(',', line.indexOf(',') + 1);
+        int thirdComma = line.indexOf(',', secondComma + 1);
+        String flowCfs = line.substring(secondComma + 1, thirdComma);
+        Serial.println(flowCfs + " cfs");
+
+        // TODO: send flowCfs to your split-flap display
+
+        break;
+      }
+
+      lineStart = lineEnd + 1;
+    }
+  }
 }

@@ -59,6 +59,19 @@ form.onsubmit = function () {
 				document.getElementById('inputHiddenCountdownDateTimeUnix').value = time;
 
 				break;
+
+			case "flow":
+				const flowCount = parseInt(document.getElementById("flowCount").value);
+				let selectedFlows = [];
+				  
+				for (let i = 0; i < flowCount; i++) {
+					const riverId = document.querySelector(`select[name="flowRiver${i}"]`).value;
+					selectedFlows.push(riverId);
+				}
+				  
+				// Save to hidden input or send directly to backend
+				document.getElementById('inputSelectedFlows').value = selectedFlows.join(',');
+				break;
 		}
 	}
 }
@@ -219,6 +232,9 @@ function setSavedMode(mode) {
 			break;
 		case "countdown":
 			document.getElementById("modeCountdown").checked = true;
+			break;
+		case "flow":
+			document.getElementById("modeFlow").checked = true;
 			break;
 	}
 
@@ -401,4 +417,32 @@ function showContent() {
 
 	elementInitialLoading.classList.add("hidden");
 	elementContent.classList.remove("hidden");
+}
+
+const riverOptions = [
+	{ id: 105, name: "Kern - Below Lake Isabella" },
+	{ id: 123, name: "Kern - Below Fairview Dam" },
+	{ id: 124, name: "Kern - Above Fairview Dam" }
+  ];
+  
+function renderFlowSelectors() {
+	const count = parseInt(document.getElementById("flowCount").value);
+	const container = document.getElementById("flowSelectorsContainer");
+	container.innerHTML = '';
+  
+	for (let i = 0; i < count; i++) {
+	  const select = document.createElement("select");
+	  select.name = `flowRiver${i}`;
+  
+	  riverOptions.forEach((river) => {
+		const option = document.createElement("option");
+		option.value = river.id;
+		option.textContent = river.name;
+		select.appendChild(option);
+	  });
+  
+	  container.appendChild(document.createTextNode(`River ${i + 1}: `));
+	  container.appendChild(select);
+	  container.appendChild(document.createElement("br"));
+	}
 }
