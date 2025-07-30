@@ -433,11 +433,6 @@ function showContent() {
 	elementContent.classList.remove("hidden");
 }
 
-const riverOptions = [
-	{ id: 105, name: "Kern - Below Lake Isabella" },
-	{ id: 123, name: "Kern - Below Fairview Dam" },
-	{ id: 124, name: "Kern - Above Fairview Dam" }
-  ];
   
 function renderFlowSelectors() {
 	const count = parseInt(document.getElementById("flowCount").value);

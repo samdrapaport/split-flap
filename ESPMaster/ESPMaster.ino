@@ -87,7 +87,7 @@
 #include "Classes.h"
 #include "LittleFS.h"
 #include <map>
-#include "/Users/samdrapaport/Documents/GitHub/split-flap/ESPMaster/HelpersFlowHandling.ino"
+//#include "/Users/samdrapaport/Documents/GitHub/split-flap/ESPMaster/HelpersFlowHandling.ino"
 
 std::vector<int> parseSelectedFlows(const String& flowsCsv);
 
@@ -190,14 +190,6 @@ const char* deviceModePath = "/devicemode.txt";
 const char* countdownPath = "/countdown.txt";
 const char* scheduledMessagesPath = "/scheduled-messages.txt";
 const char* flowPath = "/flow.txt";
-
-
-//Flow Options
-std::map<int, String> riverIdToName = {
-  {105, "Kern - Below Lake Isabella"},
-  {123, "Kern - Below Fairview Dam"},
-  {124, "Kern - Above Fairview Dam"}
-};
 
 
 //Variables for storing things for checking and use in normal running

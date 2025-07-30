@@ -31,19 +31,17 @@ String downloadDreamflowsCsv() {
 
 String getCombinedFlowsString(String csv, std::vector<int> riverIds) {
   String combinedFlows = "";
-  Serial.println("Starting flow parsing for selected rivers...");
+
+  Serial.println("Starting getCombinedFlowsString...");
+  Serial.print("Looking for river IDs: ");
+  for (int id : riverIds) {
+    Serial.print(id);
+    Serial.print(" ");
+  }
+  Serial.println();
 
   for (int id : riverIds) {
-    if (riverIdToName.find(id) == riverIdToName.end()) {
-      Serial.print("Warning: River ID not found in map: ");
-      Serial.println(id);
-      continue;
-    }
-
-    String riverName = riverIdToName[id];
-    Serial.print("Looking for flow data for: ");
-    Serial.println(riverName);
-
+    String idString = String(id);
     int lineStart = 0;
     bool found = false;
 
@@ -52,30 +50,27 @@ String getCombinedFlowsString(String csv, std::vector<int> riverIds) {
       if (lineEnd < 0) break;
 
       String line = csv.substring(lineStart, lineEnd);
-      if (line.indexOf(riverName) >= 0) {
+      if (line.startsWith(idString + ",")) {
+        found = true;
+        Serial.print("Matched ID ");
+        Serial.print(id);
+        Serial.print(" → Line: ");
+        Serial.println(line);
+
         int secondComma = line.indexOf(',', line.indexOf(',') + 1);
         int thirdComma = line.indexOf(',', secondComma + 1);
-        String flowCfs = line.substring(secondComma + 1, thirdComma);
-        flowCfs.trim();
+        String flowCfsStr = line.substring(secondComma + 1, thirdComma);
+        flowCfsStr.trim(); // In case there's whitespace
 
-        Serial.print("  Raw flow: ");
-        Serial.println(flowCfs);
+        int flow = flowCfsStr.toInt();
+        if (flow > 9999) flow = 9999;
 
-        int flowValue = flowCfs.toInt();
-        if (flowValue > 9999) {
-          Serial.println("  Flow exceeds 9999, capping to 9999");
-          flowValue = 9999;
-        }
+        char padded[5];
+        snprintf(padded, sizeof(padded), "%04d", flow);
+        combinedFlows += String(padded);
 
-        char buffer[5];
-        snprintf(buffer, sizeof(buffer), "%04d", flowValue);
-        String paddedFlow = String(buffer);
-
-        Serial.print("  Final padded flow: ");
-        Serial.println(paddedFlow);
-
-        combinedFlows += paddedFlow;
-        found = true;
+        Serial.print("Parsed flow: ");
+        Serial.println(padded);
         break;
       }
 
@@ -83,12 +78,13 @@ String getCombinedFlowsString(String csv, std::vector<int> riverIds) {
     }
 
     if (!found) {
-      Serial.print("  Error: No matching line found for river: ");
-      Serial.println(riverName);
+      Serial.print("Warning: Did not find matching line for ID ");
+      Serial.println(id);
+      combinedFlows += "----"; // Optional: indicate missing value
     }
   }
 
-  Serial.print("Final combined flow string: ");
+  Serial.print("Final combinedFlows string: ");
   Serial.println(combinedFlows);
   return combinedFlows;
 }
