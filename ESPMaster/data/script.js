@@ -79,6 +79,18 @@ form.onsubmit = function () {
 // Retrieve current Split-Flap settings when the page loads/refreshes
 window.addEventListener('load', loadPage);
 
+let riverOptions = [];
+
+function fetchRiverOptions() {
+  fetch('/rivers')
+    .then(res => res.json())
+    .then(data => {
+      riverOptions = data;
+      renderFlowSelectors(); // update dropdowns
+    });
+}
+
+
 // Request and retrieve settings from ESP-01s filesystem
 function loadPage() {
 	//Show messages from the server if need be
@@ -104,6 +116,8 @@ function loadPage() {
 		var currentDateTime = convertDateToString((new Date(Date.now() - tzOffset + 60000)));
 		dateTimeElement.value = dateTimeElement.min = currentDateTime;
 	});
+
+	fetchRiverOptions();
 
 	if (localDevelopment) {
 		setSpeed("80");

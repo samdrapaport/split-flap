@@ -86,6 +86,11 @@
 #include <Wire.h>
 #include "Classes.h"
 #include "LittleFS.h"
+#include <map>
+#include "/Users/samdrapaport/Documents/GitHub/split-flap/ESPMaster/HelpersFlowHandling.ino"
+
+std::vector<int> parseSelectedFlows(const String& flowsCsv);
+
 /* .------------------------------------------------------------------------------------. */
 /* |  ___           __ _                    _    _       ___     _   _   _              | */
 /* | / __|___ _ _  / _(_)__ _ _  _ _ _ __ _| |__| |___  / __|___| |_| |_(_)_ _  __ _ ___| */
@@ -186,12 +191,14 @@ const char* countdownPath = "/countdown.txt";
 const char* scheduledMessagesPath = "/scheduled-messages.txt";
 const char* flowPath = "/flow.txt";
 
+
 //Flow Options
 std::map<int, String> riverIdToName = {
   {105, "Kern - Below Lake Isabella"},
   {123, "Kern - Below Fairview Dam"},
   {124, "Kern - Above Fairview Dam"}
 };
+
 
 //Variables for storing things for checking and use in normal running
 String alignment = "";
@@ -201,6 +208,7 @@ String deviceMode = "";
 String countdownToDateUnix = "";
 String lastWrittenText = "";
 String lastReceivedMessageDateTime = "";
+String selectedFlows = "";
 bool alignmentUpdated = false;
 bool isPendingReboot = false;
 bool isPendingUnitsReset = false;
@@ -221,6 +229,7 @@ bool isPendingWifiReset = false;
 #if OTA_ENABLE == true
 bool isInOtaMode = false;
 #endif
+
 
 /* .-----------------------------------------------. */
 /* | ___          _          ___     _             | */
@@ -359,6 +368,11 @@ void setup() {
       }
     });
 
+    webServer.on("/rivers", HTTP_POST, [](AsyncWebServerRequest *request) {
+      String json = getRiverOptionsJson();
+      request->send(200, "text/html", "OK");
+    });
+
     webServer.on("/", HTTP_POST, [](AsyncWebServerRequest * request) {
       SerialPrintln("Request Post of Form Received");    
 
@@ -406,15 +420,9 @@ void setup() {
             newInputTextValue = p->value().c_str();
           }
 
-          /if (deviceMode == DEVICE_MODE_FLOW) {
-            String selectedFlows = webServer.arg("selectedFlows"); // e.g., "105,123"
-            Serial.println("Flow Mode selected");
-            Serial.print("Selected Flow IDs: ");
-            Serial.println(selectedFlows);
-        
-            // Store the selected flows however your app manages settings
-            // Example: split and store to EEPROM, global variable, or file
- 
+          //HTTP POST selectedFlows value
+          if (p->name() == "selectedFlows") {
+            selectedFlows = p->value().c_str();  // if you're storing in a String
           }
 
           //HTTP POST Schedule Enabled
@@ -711,6 +719,16 @@ void loop() {
   //ezTime library sync
   events(); 
   
+  //Update with the river flows
+  if (deviceMode == DEVICE_MODE_FLOW) {
+    String csv = downloadDreamflowsCsv();
+    std::vector<int> riverIds = parseSelectedFlows(selectedFlows);
+    String flows = getCombinedFlowsString(csv, riverIds);
+    inputText = flows;
+  }
+  
+
+
   //Process every second
   unsigned long currentMillis = millis();
   if (currentMillis - previousMillis >= 1000) {
@@ -773,66 +791,3 @@ String getCurrentSettingValues() {
   return jsonString;
 }
 
-String downloadDreamflowsCsv() {
-  WiFiClientSecure client;
-  client.setInsecure(); // WARNING: insecure connection
-
-  if (!client.connect("www.dreamflows.com", 443)) {
-    Serial.println("Connection to Dreamflows failed");
-    return "";
-  }
-
-  client.print("GET /realtime.csv.php HTTP/1.1\r\n" \
-               "Host: www.dreamflows.com\r\n" \
-               "Connection: close\r\n\r\n");
-
-  bool bodyStarted = false;
-  String csv = "";
-
-  while (client.connected()) {
-    String line = client.readStringUntil('\n');
-    if (line == "\r") {
-      bodyStarted = true;
-      continue;
-    }
-    if (bodyStarted) {
-      csv += line + "\n";
-    }
-  }
-
-  client.stop();
-  return csv;
-}
-
-void displayMatchingFlows(String csv, std::vector<int> riverIds) {
-  for (int id : riverIds) {
-    if (riverIdToName.find(id) == riverIdToName.end()) continue;
-
-    String riverName = riverIdToName[id];
-
-    int lineStart = 0;
-    while (lineStart >= 0) {
-      int lineEnd = csv.indexOf('\n', lineStart);
-      if (lineEnd < 0) break;
-
-      String line = csv.substring(lineStart, lineEnd);
-      if (line.indexOf(riverName) >= 0) {
-        Serial.print("Flow for ");
-        Serial.print(riverName);
-        Serial.print(": ");
-
-        // Example: line might be: "Kern - Below Lake Isabella,...,480,..."
-        int secondComma = line.indexOf(',', line.indexOf(',') + 1);
-        int thirdComma = line.indexOf(',', secondComma + 1);
-        String flowCfs = line.substring(secondComma + 1, thirdComma);
-        Serial.println(flowCfs + " cfs");
-
-        // TODO: send flowCfs to your split-flap display
-
-        break;
-      }
-
-      lineStart = lineEnd + 1;
-    }
-  }
-}
