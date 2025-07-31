@@ -331,6 +331,11 @@ void setup() {
       request->redirect("/?is-resetting-units=true");
     });
 
+    webServer.on("/rivers", HTTP_GET, [](AsyncWebServerRequest *request) {
+      String json = getRiverOptionsJson();
+      request->send(200, "application/json", json);
+    });
+
     webServer.on("/scheduled-message/remove", HTTP_DELETE, [](AsyncWebServerRequest * request) {
       SerialPrintln("Request to Remove Scheduled Message Received");
       
@@ -360,10 +365,7 @@ void setup() {
       }
     });
 
-    webServer.on("/rivers", HTTP_POST, [](AsyncWebServerRequest *request) {
-      String json = getRiverOptionsJson();
-      request->send(200, "text/html", "OK");
-    });
+
 
     webServer.on("/", HTTP_POST, [](AsyncWebServerRequest * request) {
       SerialPrintln("Request Post of Form Received");    
