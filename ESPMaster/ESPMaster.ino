@@ -151,7 +151,7 @@ IPAddress wifiPrimaryDns(8, 8, 8, 8);
 const char* espVersion = "2.2.0";
 
 //All the letters on the units that we have to be displayed. You can change these if it so pleases at your own risk
-const char letters[] = {' ', 'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z', '$', '&', '#', '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', ':', '.', '-', '?', '!'};
+const char letters[] = {'!', ' ', 'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z', '$', '&', '#', '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', ':', '.', '-', '?'};
 int displayState[UNITS_AMOUNT];
 unsigned long previousMillis = 0;
 
